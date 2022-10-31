@@ -81,7 +81,14 @@ int main(void)
  **********************************************************************/
 ISR(TIMER1_OVF_vect)
 {
-    ADCSRA |= (1 << ADSC);
+    static uint8_t no_of_overflows = 0;
+
+    no_of_overflows++;
+    if (no_of_overflows >= 3)
+    {
+        no_of_overflows = 0;
+        ADCSRA |= (1 << ADSC);
+    }
 }
 
 /**********************************************************************
@@ -90,68 +97,61 @@ ISR(TIMER1_OVF_vect)
  **********************************************************************/
 ISR(ADC_vect)
 {
-    static uint8_t no_of_overflows = 0;
+    uint16_t value;
+    char string[4];  // String for converted numbers by itoa()
 
-    no_of_overflows++;
-    if (no_of_overflows >= 3)
+    // Read converted value
+    // Note that, register pair ADCH and ADCL can be read as a 16-bit value ADC
+    value = ADC;
+
+    // Value in decimal
+    itoa(value, string, 10);
+    lcd_gotoxy(8, 0);
+    lcd_puts("     "); // Clear previous value
+    lcd_gotoxy(8, 0);
+    lcd_puts(string);
+
+    // Value in hexadecimal
+    itoa(value, string, 16);
+    lcd_gotoxy(13, 0);
+    lcd_puts("   "); // Clear previous value
+    lcd_gotoxy(13, 0);
+    lcd_puts(string);
+
+    // Voltage
+    int voltage = 5*value;
+    itoa(voltage, string, 10);
+    lcd_gotoxy(12, 1);
+    lcd_puts("     "); // Clear previous value
+    lcd_gotoxy(12, 1);
+    lcd_puts(string);
+
+    // Button name
+    lcd_gotoxy(5, 1);
+    lcd_puts("      "); // Clear previous value
+    lcd_gotoxy(5, 1);
+    if (value < 10) // Right
     {
-        no_of_overflows = 0;
-        uint16_t value;
-        char string[4];  // String for converted numbers by itoa()
-
-        // Read converted value
-        // Note that, register pair ADCH and ADCL can be read as a 16-bit value ADC
-        value = ADC;
-
-        // Value in decimal
-        itoa(value, string, 10);
-        lcd_gotoxy(8, 0);
-        lcd_puts("     "); // Clear previous value
-        lcd_gotoxy(8, 0);
-        lcd_puts(string);
-
-        // Value in hexadecimal
-        itoa(value, string, 16);
-        lcd_gotoxy(13, 0);
-        lcd_puts("   "); // Clear previous value
-        lcd_gotoxy(13, 0);
-        lcd_puts(string);
-
-        // Voltage
-        int voltage = 5*value;
-        itoa(voltage, string, 10);
-        lcd_gotoxy(12, 1);
-        lcd_puts("     "); // Clear previous value
-        lcd_gotoxy(12, 1);
-        lcd_puts(string);
-
-        // Button name
-        lcd_gotoxy(5, 1);
-        lcd_puts("      "); // Clear previous value
-        lcd_gotoxy(5, 1);
-        if (value < 10) // Right
-        {
-            lcd_puts("Right");
-        } 
-        else if (value > 138 && value < 148) // Up
-        {
-            lcd_puts("Up");
-        }
-        else if (value > 337 && value < 347) // Down
-        {
-            lcd_puts("Down");
-        }
-        else if (value > 506 && value < 516) // Left
-        {
-            lcd_puts("Left");
-        }
-        else if (value > 726 && value < 736) // Select
-        {
-            lcd_puts("Select");
-        }
-        else
-        {
-            lcd_puts("None");
-        }
+        lcd_puts("Right");
+    } 
+    else if (value > 138 && value < 148) // Up
+    {
+        lcd_puts("Up");
+    }
+    else if (value > 337 && value < 347) // Down
+    {
+        lcd_puts("Down");
+    }
+    else if (value > 506 && value < 516) // Left
+    {
+        lcd_puts("Left");
+    }
+    else if (value > 726 && value < 736) // Select
+    {
+        lcd_puts("Select");
+    }
+    else
+    {
+        lcd_puts("None");
     }
 }
