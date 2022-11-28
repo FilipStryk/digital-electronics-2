@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "stdlib.h": "c",
+        "lcd.h": "c",
+        "uart.h": "c",
+        "adc.h": "c"
+    },
+    "cortex-debug.registerUseNaturalFormat": false
+}
