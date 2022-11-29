@@ -3,7 +3,6 @@
 #endif
 
 #include <avr/io.h>
-#include <avr/eeprom.h>
 #include <avr/interrupt.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -15,9 +14,13 @@
 
 #define ENCODER_CLK PB2
 #define ENCODER_DT PB3
+
 #define MAIN_MENU_N_OF_ITEMS 2
+#define N_OF_RECORDS 10
+#define RECORDS_PER_PAGE 2
 
 #define BTN_DEBOUNCE_TIME_MS 40
+#define ENCODER_DEBOUNCE_TIME_MS 10
 
 uint64_t millis();
 
@@ -41,14 +44,18 @@ volatile uint64_t btn_encoder_prev_ms = 0;
 volatile bool btn_joystick_prev = true;
 volatile uint64_t btn_joystick_prev_ms = 0;
 
-volatile uint8_t x;
-volatile uint8_t y;
+volatile uint64_t encoder_clk_prev_ms = 0;
+volatile uint64_t encoder_dt_prev_ms = 0;
+
+volatile uint8_t x = 0;
+volatile uint8_t y = 0;
 
 volatile uint32_t score = 0;
 
 volatile uint8_t menu_selected_item = 0;
+volatile uint8_t records_page = 0;
 
-uint32_t EEMEM records_list[10] = {0};
+uint32_t list_of_records[N_OF_RECORDS] = {0};
 
 enum state_e {
     MAIN_MENU,
@@ -58,8 +65,8 @@ enum state_e {
 } state = MAIN_MENU;
 
 uint8_t playing_field[2][16] = {
-    {0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5},
-    {0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5}
+    {0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xFF, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xFF},
+    {0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xFF, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5}
 };
 
 int main(void)
@@ -119,10 +126,8 @@ int main(void)
     // enable interrupts
     sei();
 
-    // Set initial playing field
-    playing_field[0][5] = 0xFF;
-    playing_field[1][10] = 0xFF;
-    playing_field[0][15] = 0xFF;
+    DDRC |= (1 << PC5);
+    DDRC |= (1 << PC4);
 
     while (1)
     {
@@ -184,12 +189,25 @@ void main_menu()
 void records()
 {
     lcd_clrscr();
-    lcd_puts("Records");
+    char str[12];
+
+    for (uint8_t i = records_page * RECORDS_PER_PAGE; i < records_page * RECORDS_PER_PAGE + RECORDS_PER_PAGE; i++)
+    {
+        itoa(i + 1, str, 10);
+        lcd_gotoxy(0, i - records_page * RECORDS_PER_PAGE);
+        lcd_puts(str);
+        lcd_puts(". ");
+        itoa(list_of_records[i], str, 10);
+        lcd_puts(str);
+    }
 }
 
 void game_start()
 {
+    state = GAME_RUNNING;
     score = 0;
+    x = 0;
+    y = 0;
 
     // Timer to periodically start of A/D conversion sensing joystick position
     TIM1_overflow_262ms();
@@ -205,6 +223,20 @@ void game_stop()
     state = GAME_OVER;
     TIM1_overflow_interrupt_disable();
     TIM2_overflow_interrupt_disable();
+    
+    for (uint8_t i = 0; i < N_OF_RECORDS; i++)
+    {
+        if (score > list_of_records[i])
+        {
+            for (uint8_t j = N_OF_RECORDS - 1; j > i; j--)
+            {
+                list_of_records[j] = list_of_records[j - 1];
+            }
+            
+            list_of_records[i] = score;
+            break;
+        }
+    }
 }
 
 void game_draw()
@@ -226,9 +258,6 @@ void game_draw()
                     playing_field[i][j] = ' ';
                     score++;
                     lcd_putc(0x00);
-                    char str[8];
-                    itoa(score, str, 10);
-                    uart_puts(str); uart_putc('\n');
                 }
             }
             else
@@ -344,21 +373,42 @@ ISR(PCINT0_vect)
     bool clk = PINB & (1 << ENCODER_CLK);
     bool dt = PINB & (1 << ENCODER_DT);
 
-    if (clk != clk_prev && clk_prev == false) // left rotation
+    if (clk != clk_prev && clk_prev == false && dt == false && (millis() - encoder_clk_prev_ms) >= ENCODER_DEBOUNCE_TIME_MS) // left rotation
     {
+        PORTC |= (1 << PC5); _delay_us(25);
         if (state == MAIN_MENU && menu_selected_item > 0)
         {
             menu_selected_item--;
         }
+        else if (state == RECORDS && records_page > 0)
+        {
+            records_page--;
+        }
     }
-    else if (dt != dt_prev && dt_prev == false) // right rotation
+    else if (dt != dt_prev && dt_prev == false && clk == false && (millis() - encoder_dt_prev_ms) >= ENCODER_DEBOUNCE_TIME_MS) // right rotation
     {
+        PORTC |= (1 << PC4); _delay_us(25);
         if (state == MAIN_MENU && menu_selected_item < MAIN_MENU_N_OF_ITEMS - 1)
         {
             menu_selected_item++;
         }
+        else if (state == RECORDS && records_page < N_OF_RECORDS / RECORDS_PER_PAGE - 1)
+        {
+            records_page++;
+        }
     }
 
+    if (clk != clk_prev && clk == true)
+    {
+        encoder_clk_prev_ms = millis();
+    }
+    else if (dt != dt_prev && dt == true)
+    {
+        encoder_dt_prev_ms = millis();
+    }
+
+    PORTC &= ~(1 << PC5);
+    PORTC &= ~(1 << PC4);
     clk_prev = clk;
     dt_prev = dt;
 }
@@ -385,6 +435,10 @@ ISR(INT0_vect)
         {
             state = MAIN_MENU;
         }
+        else if (state == GAME_OVER)
+        {
+            state = MAIN_MENU;
+        }
     }
 
     btn_encoder_prev = btn_encoder;
@@ -399,7 +453,7 @@ ISR(INT1_vect)
     {
         if (state == GAME_OVER)
         {
-            state = MAIN_MENU;
+            game_start();
         }
     }
 
