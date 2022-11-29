@@ -13,4 +13,6 @@
 
 #define adc_select_channel(ch) ADMUX &= 0xF0; ADMUX |= ch & 0x0F;
 
+#define adc_get_current_channel() ADMUX & 0x0F;
+
 #endif

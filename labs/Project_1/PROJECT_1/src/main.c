@@ -6,6 +6,7 @@
 #include <avr/interrupt.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include <util/delay.h>
 #include "lcd.h"
 #include "timer.h"
@@ -33,30 +34,42 @@ void game_draw();
 void game_scroll();
 void game_stop();
 
+// number of milliseconds since power-on
 volatile uint64_t timer_millis = 0;
 
+// variables to store previous values of rotary encoder signals
 volatile bool clk_prev = true;
 volatile bool dt_prev = true;
-volatile uint8_t val = 0;
 
+// variables to store previous buttons values
 volatile bool btn_encoder_prev = true;
-volatile uint64_t btn_encoder_prev_ms = 0;
 volatile bool btn_joystick_prev = true;
+
+// variables to store the time when button values has changed
+volatile uint64_t btn_encoder_prev_ms = 0;
 volatile uint64_t btn_joystick_prev_ms = 0;
 
+// variables to store the time when the rotary encoder values has changed
 volatile uint64_t encoder_clk_prev_ms = 0;
 volatile uint64_t encoder_dt_prev_ms = 0;
 
+// coordinates of the players
 volatile uint8_t x = 0;
 volatile uint8_t y = 0;
 
+// player's score
 volatile uint32_t score = 0;
 
+// index of the selected item in the menu
 volatile uint8_t menu_selected_item = 0;
-volatile uint8_t records_page = 0;
 
+// index of the current page when viewing records
+volatile uint8_t records_current_page = 0;
+
+// array with record values
 uint32_t list_of_records[N_OF_RECORDS] = {0};
 
+// variable to store current program state
 enum state_e {
     MAIN_MENU,
     GAME_RUNNING, 
@@ -64,17 +77,20 @@ enum state_e {
     RECORDS,
 } state = MAIN_MENU;
 
-uint8_t playing_field[2][16] = {
+// initial playing field
+uint8_t initial_playing_field[2][16] = {
     {0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xFF, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xFF},
     {0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xFF, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5}
 };
 
+uint8_t playing_field[2][16];
+
 int main(void)
 {
-    // initialize the pseude-random generator seed
-    srand(2318);
+    // initialize the pseudo-random generator seed
+    srand(5815);
 
-    // initialoze UART for debugging
+    // initialize UART for debugging
     uart_init(UART_BAUD_SELECT(9600, F_CPU));
 
     // initialize LCD
@@ -98,7 +114,7 @@ int main(void)
     }
     lcd_command(1 << LCD_DDRAM);
 
-    // Enable A/D converter with internal reference, prescaler value 128 and interrupt after the conversion if complete
+    // Enable A/D converter with internal reference, prescaler value 128 and interrupt after the conversion is completed
     adc_internal_ref();
     adc_select_channel(0);
     adc_enable();
@@ -110,8 +126,8 @@ int main(void)
     TIM0_overflow_interrupt_enable();
 
     // Set rotary encoder pins as input with pull-up resistors and enable pin change interrupts for these pins
-    DDRB &= ~((1 << PB2) | (1 << PB3));
-    PORTB |= (1 << PB2) | (1 << PB3);
+    DDRB &= ~((1 << ENCODER_CLK) | (1 << ENCODER_DT));
+    PORTB |= (1 << ENCODER_CLK) | (1 << ENCODER_DT);
     PCMSK0 |= (1 << PCINT2) | (1 << PCINT3);
     PCICR |= (1 << PCIE0);
     
@@ -126,21 +142,27 @@ int main(void)
     // enable interrupts
     sei();
 
+    // TODO: Delete
     DDRC |= (1 << PC5);
     DDRC |= (1 << PC4);
 
+    // Ininite loop
     while (1)
     {
+        // Call the corresponding function according to the current state
         switch (state)
         {
             case MAIN_MENU:
+                // Show main menu
                 main_menu();
                 _delay_ms(50);
                 break;
             case RECORDS:
+                // Show records
                 records();
                 _delay_ms(50);
             case GAME_RUNNING:
+                // no need to call a function, because the game is perodically drawn using timer and interrupts
                 break;
             case GAME_OVER:
                 lcd_clrscr();
@@ -151,7 +173,7 @@ int main(void)
                 itoa(score, str, 10);
                 lcd_puts("Score: ");
                 lcd_puts(str);
-                _delay_ms(100);
+                _delay_ms(50);
                 break;
         }
     }
@@ -159,7 +181,7 @@ int main(void)
     return 0;
 }
 
-// Returns number of milliseconds since power up
+// Returns number of milliseconds since power-up
 uint64_t millis()
 {
     // disable interrupts
@@ -171,13 +193,16 @@ uint64_t millis()
     return val;
 }
 
+// Displays the main menu 
 void main_menu()
 {
     lcd_clrscr();
     char menu_items[MAIN_MENU_N_OF_ITEMS][15] = {"Start game", "Show records"};
+    // Loop through menu items
     for (uint8_t i = 0; i < MAIN_MENU_N_OF_ITEMS; i++)
     {
         lcd_gotoxy(0, i);
+        // Highlight the selected menu item with '>' character on the beginning of the line
         if (i == menu_selected_item)
         {
             lcd_putc('>');
@@ -186,15 +211,16 @@ void main_menu()
     }
 }
 
+// Displays the list of records
 void records()
 {
     lcd_clrscr();
     char str[12];
-
-    for (uint8_t i = records_page * RECORDS_PER_PAGE; i < records_page * RECORDS_PER_PAGE + RECORDS_PER_PAGE; i++)
+    // Loop through the items on the current page
+    for (uint8_t i = records_current_page * RECORDS_PER_PAGE; i < records_current_page * RECORDS_PER_PAGE + RECORDS_PER_PAGE; i++)
     {
         itoa(i + 1, str, 10);
-        lcd_gotoxy(0, i - records_page * RECORDS_PER_PAGE);
+        lcd_gotoxy(0, i - records_current_page * RECORDS_PER_PAGE);
         lcd_puts(str);
         lcd_puts(". ");
         itoa(list_of_records[i], str, 10);
@@ -202,65 +228,84 @@ void records()
     }
 }
 
+// Starts the game
 void game_start()
 {
+    // set previous score as pseudo-random generator seed to increase randomness
+    srand(score);
+    // set state and reset variables
     state = GAME_RUNNING;
     score = 0;
     x = 0;
     y = 0;
 
-    // Timer to periodically start of A/D conversion sensing joystick position
+    // copy the initial playing field into the real playing filed
+    memcpy(playing_field, initial_playing_field, sizeof(playing_field));
+
+    // set timer to periodically start the A/D conversion sensing joystick position
     TIM1_overflow_262ms();
     TIM1_overflow_interrupt_enable();
 
-    // Timer to periodically move playing field to the left
+    // set timer to periodically move playing field to the left
     TIM2_overflow_16ms();
     TIM2_overflow_interrupt_enable();
 }
 
+// Stops the game
 void game_stop()
 {
+    // set state and disable timers
     state = GAME_OVER;
     TIM1_overflow_interrupt_disable();
     TIM2_overflow_interrupt_disable();
     
+    // loop through all the records
     for (uint8_t i = 0; i < N_OF_RECORDS; i++)
     {
+        // check whether the current score is higher than the one in the list of records
         if (score > list_of_records[i])
         {
+            // insert the new score into position of the old one and push the remaining values to lower positions
             for (uint8_t j = N_OF_RECORDS - 1; j > i; j--)
             {
                 list_of_records[j] = list_of_records[j - 1];
             }
             
             list_of_records[i] = score;
+            // break the for-loop after inserting the new record
             break;
         }
     }
 }
 
+// Renders the game onto the LCD
 void game_draw()
 {
+    // loop through the rows
     for (uint8_t i = 0; i < 2; i++)
     {
         lcd_gotoxy(0, i);
+        // loop through the columns
         for (uint8_t j = 0; j < 16; j++)
         {
+            // check whether the position of the currently drawn item equals to user's position
             if (i == y && j == x)
-            {
+            {   
+                // check whether there is an obstacle on the player's current position and stop the game if yes
                 if (playing_field[i][j] == 0xFF)
                 {
                     game_stop();
                     return;
                 }
-                else
+                else // or increase the score if not
                 {
                     playing_field[i][j] = ' ';
                     score++;
+                    // draw the custom character of the player
                     lcd_putc(0x00);
                 }
             }
-            else
+            else // draw the field's item character
             {
                 lcd_putc(playing_field[i][j]);
             }
@@ -268,50 +313,65 @@ void game_draw()
     }
 }
 
+// Scrolls the playing field to the left by one position
 void game_scroll()
 {
+    // loop thgrough the rows
     for (uint8_t i = 0; i < 2; i++)
     {
+        // loop through the columns
         for (uint8_t j = 0; j < 15; j++)
         {
+            // move the field item to the left
             playing_field[i][j] = playing_field[i][j+1];
         }
     }
 
+    // generate random number
     uint8_t rnd = rand();
+    // probability 20 % that there will be an obstacle in the newly generated column
     if (rnd % 5 == 0)
     {
+        // insert an obstacle in the row according to whether the number is divisible by 2 or not 
+        // (row indexes are 0 and 1, as well as the result of % 2)
         uint8_t x_coord = rnd % 2;
+        // check if there isn't an obstacle in the diagonally adjacent item
+        // (that would prevent the player from overcoming the obstacle)
         if (playing_field[(rnd + 1) % 2][14] != 0xFF)
         {
+            // insert the new obstacle if there isn't the adjecent one
             playing_field[x_coord][15] = 0xFF;
         }
         else
         {
+            // insert regular character otherwise
             playing_field[x_coord][15] = 0xA5;
         }
+
+        // insert regular character into the remaining row
         playing_field[(rnd + 1) % 2][15] = 0xA5;
     }
     else
     {
+        // insert regular characters without the obstacle if the number is not divisible by 5
         playing_field[0][15] = 0xA5;
         playing_field[1][15] = 0xA5;
     }
 }
 
-// increments the number of milliseconds since power up
+// Increments the number of milliseconds elapsed since the power-up
 ISR(TIMER0_OVF_vect)
 {
     timer_millis++;
 }
 
-// starts the A/D conversion
+// Starts the A/D conversion
 ISR(TIMER1_OVF_vect)
 {
     adc_start_conversion();
 }
 
-// scrolls the playing field to the left approx. every  500 ms
+// Scrolls the playing field to the left and redraws it approx. every  500 ms (3x16 = 496 ms)
 ISR(TIMER2_OVF_vect)
 {
     static uint8_t n_of_overflows = 0;
@@ -325,14 +385,15 @@ ISR(TIMER2_OVF_vect)
     }
 }
 
-
+// Senses the joystick position
 ISR(ADC_vect)
 {
 
     uint16_t value;
     value = ADC;
 
-    uint8_t channel = ADMUX & 0xF;
+    uint8_t channel = adc_get_current_channel();
+    // Move the player according to sensed value from the current channel 
     switch (channel)
     {
         case 0:
@@ -347,6 +408,7 @@ ISR(ADC_vect)
                 game_draw();
             }
 
+            // Switch ADC to the channel 1 and start the conversion again
             adc_select_channel(1);
             adc_start_conversion();
             break;
@@ -362,6 +424,7 @@ ISR(ADC_vect)
                 y--;
                 game_draw();
             }
+            // Switch the ADC back to the channel 0
             adc_select_channel(0);
             break;
     }
@@ -380,9 +443,9 @@ ISR(PCINT0_vect)
         {
             menu_selected_item--;
         }
-        else if (state == RECORDS && records_page > 0)
+        else if (state == RECORDS && records_current_page > 0)
         {
-            records_page--;
+            records_current_page--;
         }
     }
     else if (dt != dt_prev && dt_prev == false && clk == false && (millis() - encoder_dt_prev_ms) >= ENCODER_DEBOUNCE_TIME_MS) // right rotation
@@ -392,9 +455,9 @@ ISR(PCINT0_vect)
         {
             menu_selected_item++;
         }
-        else if (state == RECORDS && records_page < N_OF_RECORDS / RECORDS_PER_PAGE - 1)
+        else if (state == RECORDS && records_current_page < N_OF_RECORDS / RECORDS_PER_PAGE - 1)
         {
-            records_page++;
+            records_current_page++;
         }
     }
 
@@ -413,10 +476,12 @@ ISR(PCINT0_vect)
     dt_prev = dt;
 }
 
-
+// Handles the INT0 interrupt (encoder button)
 ISR(INT0_vect)
 {
+    // read the current pin value (0 if pressed)
     bool btn_encoder = PIND & (1 << PD2);
+    // check whether the button has been pushed and whether the passed time between the two interrupts was greater than BTN_DEBOUNCE_TIME_MS
     if (btn_encoder_prev != btn_encoder && btn_encoder == false && (millis() - btn_encoder_prev_ms) >= BTN_DEBOUNCE_TIME_MS)
     {
         if (state == MAIN_MENU)
@@ -445,10 +510,12 @@ ISR(INT0_vect)
     btn_encoder_prev_ms = millis();
 }
 
-
+// Handles the INT1 interrupt (joystick button)
 ISR(INT1_vect)
 {
+    // read the current pin value (0 if pressed)
     bool btn_joystick = PIND & (1 << PD3);
+    // check whether the button has been pushed and whether the passed time between the two interrupts was greater than BTN_DEBOUNCE_TIME_MS
     if (btn_joystick_prev != btn_joystick && btn_joystick == false && (millis() - btn_joystick_prev_ms) >= BTN_DEBOUNCE_TIME_MS)
     {
         if (state == GAME_OVER)
