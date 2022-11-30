@@ -142,10 +142,6 @@ int main(void)
     // enable interrupts
     sei();
 
-    // TODO: Delete
-    DDRC |= (1 << PC5);
-    DDRC |= (1 << PC4);
-
     // Ininite loop
     while (1)
     {
@@ -438,7 +434,6 @@ ISR(PCINT0_vect)
 
     if (clk != clk_prev && clk_prev == false && dt == false && (millis() - encoder_clk_prev_ms) >= ENCODER_DEBOUNCE_TIME_MS) // left rotation
     {
-        PORTC |= (1 << PC5); _delay_us(25);
         if (state == MAIN_MENU && menu_selected_item > 0)
         {
             menu_selected_item--;
@@ -450,7 +445,6 @@ ISR(PCINT0_vect)
     }
     else if (dt != dt_prev && dt_prev == false && clk == false && (millis() - encoder_dt_prev_ms) >= ENCODER_DEBOUNCE_TIME_MS) // right rotation
     {
-        PORTC |= (1 << PC4); _delay_us(25);
         if (state == MAIN_MENU && menu_selected_item < MAIN_MENU_N_OF_ITEMS - 1)
         {
             menu_selected_item++;
@@ -470,8 +464,6 @@ ISR(PCINT0_vect)
         encoder_dt_prev_ms = millis();
     }
 
-    PORTC &= ~(1 << PC5);
-    PORTC &= ~(1 << PC4);
     clk_prev = clk;
     dt_prev = dt;
 }
