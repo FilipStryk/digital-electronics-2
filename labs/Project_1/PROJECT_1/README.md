@@ -111,7 +111,7 @@ Obr. č. 1 Schéma zapojení v programu SimulIDE
 <img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project-documentation/images/Enkoder.jpg">
 
 * Joystik jde zde využit jako ovladání průběhu samotné hry, kdy se pomocí něho můžeme pohybovat po displeji nahoru, dolů, doleva a doprava. Joystik využívá dva kanály pro hodnoty v ose x a pro hodnoty v ose y, kdy pro změnu kanálu, ze které chceme momentálně načítat hodnoty je zde využita funkce switch. Díky tomu je program schopen určit pohyb horizontálně respektive svisle. Podmínky nám zde zaručují, že se nemůžeme dostat mimo displej.
-<img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project-documentation/images/Joystic.jpg">
+<img src="https://github.com/xpecon00/digital-electronics-5/blob/main/labs/Project_1/PROJECT_1/images/Joystik.jpg">
 
 * Rotační enkodér a joystik mají v sobě zabudované tlačitko. Tlačitko enkodéru využívéme pro spuštění hry, pro návrat zpět a pro zobrazení rekordů. Když skončí kolo hry, tak díky následnému stisknutí tlačítka joystiku se hra spustí znovu. 
 <img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project-documentation/images/Buttons.jpg">
