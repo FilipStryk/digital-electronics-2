@@ -426,14 +426,18 @@ ISR(ADC_vect)
     }
 }
 
-
+// Handles the Pin Change Interrupt 0 (PB2 and PB3)
 ISR(PCINT0_vect)
 {
+    // Get current values of the encoder signals
     bool clk = PINB & (1 << ENCODER_CLK);
     bool dt = PINB & (1 << ENCODER_DT);
 
+    // Check, whether the one signal has changed to active, while the other signal was active (active-low => false) 
+    // and whether the time between the two changes was greater than or equal to ENCODER_DEBOUNCE_TIME_MS
     if (clk != clk_prev && clk_prev == false && dt == false && (millis() - encoder_clk_prev_ms) >= ENCODER_DEBOUNCE_TIME_MS) // left rotation
     {
+        // Check whether the selected item is within the bounds and decrease the value
         if (state == MAIN_MENU && menu_selected_item > 0)
         {
             menu_selected_item--;
@@ -445,6 +449,7 @@ ISR(PCINT0_vect)
     }
     else if (dt != dt_prev && dt_prev == false && clk == false && (millis() - encoder_dt_prev_ms) >= ENCODER_DEBOUNCE_TIME_MS) // right rotation
     {
+        // Check whether the selected item is within the bounds and increase the value
         if (state == MAIN_MENU && menu_selected_item < MAIN_MENU_N_OF_ITEMS - 1)
         {
             menu_selected_item++;
@@ -455,6 +460,7 @@ ISR(PCINT0_vect)
         }
     }
 
+    // Save the time of last signal deactivation
     if (clk != clk_prev && clk == true)
     {
         encoder_clk_prev_ms = millis();
