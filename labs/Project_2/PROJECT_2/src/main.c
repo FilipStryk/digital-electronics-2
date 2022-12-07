@@ -58,6 +58,7 @@ int main(void)
     TIM0_overflow_1ms();
     TIM0_overflow_interrupt_enable();
 
+
     DDRB |= (1 << PB1) | (1 << PB2);
 
     TCCR1A |= (1 << WGM11) | (1 << COM1A1) | (1 << COM1B1);
@@ -66,6 +67,7 @@ int main(void)
     OCR1A = servo1_position;
     OCR1B = servo2_position;
     TCCR1B |= (1 << CS11);
+
 
     // Set encoder and joystick button pins (INT0/1) as inputs with pull-up resistor
     DDRD &= ~(1 << PD2);
