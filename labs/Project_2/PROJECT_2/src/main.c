@@ -16,21 +16,14 @@
 #define ENCODER_CLK PB2
 #define ENCODER_DT PB3
 
-#define MAIN_MENU_N_OF_ITEMS 2
-#define N_OF_RECORDS 10
-#define RECORDS_PER_PAGE 2
-
 #define BTN_DEBOUNCE_TIME_MS 40
-#define ENCODER_DEBOUNCE_TIME_MS 10
 
 #define SERVO_DEFAULT 1500
 #define SERVO_MIN 600
 #define SERVO_MAX 2400
 #define SERVO_STEP 25
 
-
 uint64_t millis();
-
 
 // number of milliseconds since power-on
 volatile uint64_t timer_millis = 0;
@@ -45,7 +38,6 @@ int main(void)
 {
     // initialize UART for debugging
     uart_init(UART_BAUD_SELECT(9600, F_CPU));
-
 
     // Enable A/D converter with internal reference, prescaler value 128 and interrupt after the conversion is completed
     adc_internal_ref();
@@ -68,7 +60,6 @@ int main(void)
     OCR1B = servo2_position;
     TCCR1B |= (1 << CS11);
 
-
     // Set encoder and joystick button pins (INT0/1) as inputs with pull-up resistor
     DDRD &= ~(1 << PD2);
     PORTD |= (1 << PD2);
@@ -76,7 +67,6 @@ int main(void)
     EICRA |= (1 << ISC00);
     // Enable external interrupts INT0 and INT1 
     EIMSK |= (1 << INT0);
-
 
     // enable interrupts
     sei();
@@ -119,7 +109,6 @@ ISR(TIMER0_OVF_vect)
 // Senses the joystick position
 ISR(ADC_vect)
 {
-
     uint16_t value;
     value = ADC;
 
