@@ -94,7 +94,7 @@ Pro tuto aplikaci byla zvolena předdělička čítače o hodnotě 8. Hodnota TO
 <img src="images/flow2.png">
 
 ### Video
-https://www.youtube.com/watch?v=-NYkx1fyxWs
+https://www.youtube.com/watch?v=oJ7rBAjEaFI
 
 ### Zdroje
 
