@@ -8,7 +8,7 @@ David Pěčonka
 * podílel dokumentaci a videu
 
 ### Cíl projektu
-Cílem projektu byl návrh a následná realizace aplikace, která pro svou funkci využívá joystik a dva servo motory. Naším návrhem je vytvoření ovládání smeru otáčení obou servo motorů pomocí pohybu joystikem.
+Cílem projektu byl návrh a následná realizace aplikace, která pro svou funkci využívá joystick a dva servomotory. Naším návrhem je vytvoření ovládání pozice obou servomotorů pomocí pohybu joystickem.
 
 ### Struktura projektu
    ```c
@@ -19,12 +19,6 @@ Cílem projektu byl návrh a následná realizace aplikace, která pro svou funk
    │   └── adc
    │        └── adc.c
    │        └── adc.h
-   │   └── gpio
-   │        └── gpio.c
-   │        └── gpio.h
-   │   └── uart
-   │        └── uart.c
-   │        └── uart.h
    ├── src             // Source file(s)
    │   └── main.c
    ├── test            // No need this
@@ -35,15 +29,15 @@ Cílem projektu byl návrh a následná realizace aplikace, která pro svou funk
 ### Popis HARDWARE
 
 #### ATMega328p
-<img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project2_documentation/images/11.png" width="350">
+![](images/11.png)
 
 Piny 9,10 [1]:
 
-- slouží pro připojení dvou servo motorů (PWM)
+- slouží pro připojení dvou servomotorů (PWM)
 
 Piny 2 [2]:
 
-- slouží pro připojení tlíčka, které obashuje joystik
+- slouží pro připojení tlačítka, které obsahuje joystick
 
 Piny 0,1 [3]:
 
@@ -58,35 +52,46 @@ MicroUSB [5]:
 - určeno k nahrávání programu do mikrokontroléru
 
 #### Joystik
-<img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project-documentation/images/joystick.jpg" width="300">
+<img src="images/joystick.jpg" width="300">
 
 - Pin GND slouží k uzemnění
-- Pin +5 určen pro napájení joystiku
-- Pin Vrx slouží pro určení polohy joystiku v ose x
-- Pin Vry slouží pro určení polohy joystiku v ose y
+- Pin +5 určen pro napájení joysticku
+- Pin Vrx slouží pro určení polohy joysticku v ose x
+- Pin Vry slouží pro určení polohy joysticku v ose y
 - Pin SW je určen pro přenos informace o tlačítku
 
-Joystik využíváme pro ovládání hry. Pohyb všemi směry, tlačítko slouží pro opětovné spuštění hry po skončení. 
+Joystick využíváme pro ovládání servomotorů.
 
 #### Dva servo motory 
-<img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project2_documentation/images/servo.jpg" width="300">
+<img src="images/servo.jpg" width="300">
 
 - Hnedý drátek GND slouží pro uzemnění
-- Červené drátek slouží pro napájení 5V
+- Červený drátek slouží pro napájení 5V
 - Oranžový drátek souží pro příjem PWM z mikrokontroleru
 
 ### Schéma zapojení
-<img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project2_documentation/images/projekt%202%20de.png">
+![alt](images/schema.png)
 Obr. č. 1 Schéma zapojení v programu SimulIDE
 
 ### Popis SOFTWARE
 
-* První vývojový diagram znázorňuje nejduležitější část našeho programu. Pomocí toho jakým směrem joystikem pohybujeme, zda ve směru osy x resp. ve směru osy y, tak dle toho se vybírá příslušný kanál. Kanál 0 indikuje pohyb ve směru osy x a kanál 1 pohyb ve směru osy y. Jestliže joystikem pohybujeme doleva či doprava, tak se servo č.1
-otáčí doleva respektive doprava. Naopak pokud joystikem pohybujeme nahoru či dolů, tak se servo č.2 otáčí nahoru respektive dolů.  
-<img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project2_documentation/images/flow1.png">
+Serveromotory jsou řízený obdélníkovým signálem o frekvenci 50 Hz s pulzně-šířkovou modulací. Serva se natáčí do pozice od 0 do 180° (resp. od -90° do +90°) podle šířky pulzu v rozmezí od 0.6 ms do 2.4 ms.
 
-* Druhý vývojový diagram znázorńuje využití tlačítka zabudovaném v joystiku. Pokud dojde ke stistknutí tlačítka oba servo motory zaujmou svou původní pozici. Původní pozice je zde nastavena na střední hodnotu maximálních pozic obou servo motorů.
-<img src="https://github.com/xpecon00/digital_electronics_2/blob/main/project2_documentation/images/flow2.png">
+Pro generování PWM je použit čítač 1 v režimu Phase Correct PWM. V tomto režimu čítač čítá od 0 po hodnotu TOP, uloženou v registru ICR1. Po dosažení této hodnoty změní čítač směr čítání a po opětovném dosažení 0 čítá znova nahoru. Pokaždé, když se aktuální hodnota čítače (v registru TCNT1) rovná hodnotě v registru OCR1A nebo OCR1B pro kanál jedna, respektive 2, tak dojde k negaci aktuální hodnoty na výstupu daného kanálu.
+
+Pro tuto aplikaci byla zvolena předdělička čítače o hodnotě 8. Hodnota TOP pro danou předděličku a potřebnou frekvenci 50 Hz je 20 000. V tomto případě pak hodnota v registrech OCR1A/B odpovídá délce pulzu v mikrosekundách.
+
+![alt](images/TOP.gif)
+
+![alt](images/OCR_min.gif)
+
+![alt](images/OCR_max.gif)
+
+* První vývojový diagram znázorňuje nejdůležitější část našeho programu. Pomocí toho, jakým směrem joystickem pohybujeme - zda ve směru osy x resp. ve směru osy y - dle toho se vybírá příslušný kanál. Kanál 0 indikuje pohyb ve směru osy x a kanál 1 pohyb ve směru osy y. Jestliže joystickem pohybujeme doleva či doprava, tak se servo č.1 otáčí. Naopak pokud joystickem pohybujeme nahoru či dolů, tak se otáčí servo č.2.
+![alt](images/ADC_vect.png)
+
+* Druhý vývojový diagram znázorńuje využití tlačítka zabudovaného v joysticku. Pokud dojde ke stistknutí tlačítka, oba servo motory zaujmou svou výchozí pozici. Výchozí pozice je zde nastavena na střední hodnotu maximálních pozic obou servo motorů.
+<img src="images/flow2.png">
 
 ### Video
 https://www.youtube.com/watch?v=-NYkx1fyxWs

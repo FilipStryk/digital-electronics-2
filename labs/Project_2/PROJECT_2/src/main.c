@@ -1,20 +1,11 @@
-#ifndef F_CPU
-    #define F_CPU 16000000  // CPU frequency in Hz required for UART_BAUD_SELECT
-#endif
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <util/delay.h>
-#include "lcd.h"
 #include "timer.h"
 #include "adc.h"
-#include "uart.h"
-
-#define ENCODER_CLK PB2
-#define ENCODER_DT PB3
 
 #define BTN_DEBOUNCE_TIME_MS 40
 
@@ -36,9 +27,6 @@ volatile uint64_t btn_joystick_prev_ms = 0;
 
 int main(void)
 {
-    // initialize UART for debugging
-    uart_init(UART_BAUD_SELECT(9600, F_CPU));
-
     // Enable A/D converter with internal reference, prescaler value 128 and interrupt after the conversion is completed
     adc_internal_ref();
     adc_select_channel(0);
@@ -50,14 +38,20 @@ int main(void)
     TIM0_overflow_1ms();
     TIM0_overflow_interrupt_enable();
 
-
+    // Set pins PB1 and PB2 as output
     DDRB |= (1 << PB1) | (1 << PB2);
 
-    TCCR1A |= (1 << WGM11) | (1 << COM1A1) | (1 << COM1B1);
+    // Set timer 1 to phase correct PWM mode
+    TCCR1A |= (1 << WGM11);
     TCCR1B |= (1 << WGM13);
+    // Set Output Compare pins to non-inverting mode
+    TCCR1A |= (1 << COM1A1) | (1 << COM1B1);
+    // Set top value to 20 000
     ICR1 = 20000;
+    // Set duty cycle according to servo's default position
     OCR1A = servo1_position;
     OCR1B = servo2_position;
+    // Set prescaler to 8 and enable counter
     TCCR1B |= (1 << CS11);
 
     // Set encoder and joystick button pins (INT0/1) as inputs with pull-up resistor
@@ -71,7 +65,7 @@ int main(void)
     // enable interrupts
     sei();
 
-    // Ininite loop
+    // Infinite loop
     while (1)
     {
         
@@ -92,8 +86,6 @@ uint64_t millis()
     return val;
 }
 
-
-
 // Increments the number of milliseconds elapsed since the power-up
 ISR(TIMER0_OVF_vect)
 {
@@ -113,7 +105,7 @@ ISR(ADC_vect)
     value = ADC;
 
     uint8_t channel = adc_get_current_channel();
-    // Move the player according to sensed value from the current channel 
+    // Move the servo according to sensed value from the current channel 
     switch (channel)
     {
         case 0:
@@ -155,6 +147,7 @@ ISR(INT0_vect)
     // check whether the button has been pushed and whether the passed time between the two interrupts was greater than BTN_DEBOUNCE_TIME_MS
     if (btn_joystick_prev != btn_joystick && btn_joystick == false && (millis() - btn_joystick_prev_ms) >= BTN_DEBOUNCE_TIME_MS)
     {
+        // reset servo positions
         servo1_position = SERVO_DEFAULT;
         servo2_position = SERVO_DEFAULT;
     }
